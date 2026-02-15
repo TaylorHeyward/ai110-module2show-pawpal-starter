@@ -1,30 +1,119 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from enum import Enum
+import uuid
 from typing import List, Dict, Optional, Tuple
+
+
+class TaskStatus(Enum):
+    PENDING = "pending"
+    DONE = "done"
+    SKIPPED = "skipped"
+
+
+@dataclass
+class Recurrence:
+    """A minimal, structured recurrence placeholder.
+
+    For a production system prefer using dateutil.rrule or a richer model.
+    """
+    freq: str  # e.g. 'daily', 'weekly', 'monthly'
+    interval: int = 1
+    count: Optional[int] = None
+    until: Optional[date] = None
 
 
 @dataclass
 class Task:
-    task_id: str
-    title: str
-    due_datetime: datetime
+    """Task represents a schedulable item.
+
+    Notes:
+    - Prefer timezone-aware datetimes. This skeleton accepts datetimes and
+      callers should normalize to UTC before storing.
+    - Both a start time and/or a due time are supported. Duration is optional.
+    - task_id defaults to a UUID string to avoid collisions on human names.
+    """
+
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = ""
+    # Prefer start_datetime for interval tasks. due_datetime can be used for
+    # deadline-style tasks.
+    start_datetime: Optional[datetime] = None
+    due_datetime: Optional[datetime] = None
+    duration: Optional[timedelta] = None
     priority: int = 3
-    status: str = "pending"
-    recurrence: Optional[str] = None
+    status: TaskStatus = TaskStatus.PENDING
+    recurrence: Optional[Recurrence] = None
+    # optional link to parent pet id (system may populate this)
+    pet_id: Optional[str] = None
 
     def mark_done(self) -> None:
         """Mark the task as done (placeholder)."""
-        pass
+        self.status = TaskStatus.DONE
 
     def is_due_on(self, target_date: date) -> bool:
-        """Return True if the task is due on target_date (placeholder)."""
-        pass
+        """Return True if the task (or an occurrence) falls on target_date.
+
+        Placeholder: actual implementation must consider recurrence and
+        timezone-normalization.
+        """
+        if self.due_datetime is None:
+            return False
+
+        base_date = self.due_datetime.date()
+        # No recurrence: due date must match exactly
+        if not self.recurrence:
+            return base_date == target_date
+
+        # Simple recurrence: support 'daily' and 'weekly' with interval in Recurrence
+        delta_days = (target_date - base_date).days
+        if delta_days < 0:
+            return False
+
+        freq = self.recurrence.freq if isinstance(self.recurrence, Recurrence) else None
+        interval = self.recurrence.interval if isinstance(self.recurrence, Recurrence) else 1
+
+        if freq == "daily":
+            return (delta_days % interval) == 0
+        if freq == "weekly":
+            return ((delta_days // 7) % interval) == 0
+
+        # Unknown recurrence type; be conservative
+        return False
 
     def next_occurrence(self) -> Optional[datetime]:
-        """Compute the next occurrence for recurring tasks (placeholder)."""
-        pass
+        """Compute the next occurrence for recurring tasks (placeholder).
+
+        Placeholder: implement using Recurrence or an rrule library.
+        """
+        if self.due_datetime is None or not self.recurrence:
+            return None
+
+        now = datetime.now(self.due_datetime.tzinfo)
+        base = self.due_datetime
+
+        freq = self.recurrence.freq
+        interval = self.recurrence.interval
+
+        if freq == "daily":
+            days = (now.date() - base.date()).days
+            if days < 0:
+                return base
+            # how many intervals have passed
+            steps = (days // interval) + 1
+            return datetime.combine(base.date() + timedelta(days=steps * interval), base.time())
+
+        if freq == "weekly":
+            days = (now.date() - base.date()).days
+            if days < 0:
+                return base
+            weeks = (days // 7)
+            steps = (weeks // interval) + 1
+            return datetime.combine(base.date() + timedelta(weeks=steps * interval), base.time())
+
+        return None
 
 
 @dataclass
@@ -34,58 +123,223 @@ class Pet:
     age: int
     notes: str = ""
     tasks: List[Task] = field(default_factory=list)
+    pet_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def add_task(self, task: Task) -> None:
-        """Add a task to this pet (placeholder)."""
-        pass
+        """Add a task to this pet (placeholder).
+
+        Note: The system should generally assign/validate task IDs and
+        normalize datetimes; Pet.add_task should only mutate in-memory state.
+        """
+        # attach lightweight back-reference and store
+        task.pet_id = getattr(self, "pet_id", None)
+        self.tasks.append(task)
 
     def remove_task(self, task_id: str) -> bool:
         """Remove a task by id; return True if removed (placeholder)."""
-        pass
+        for i, t in enumerate(self.tasks):
+            if t.task_id == task_id:
+                del self.tasks[i]
+                return True
+        return False
 
     def get_tasks_for_date(self, target_date: date) -> List[Task]:
-        """Return tasks for the given date (placeholder)."""
-        pass
+        """Return tasks/occurrences for the given date (placeholder).
+
+        With recurrence this requires expansion of occurrences. Decide whether
+        expansion happens at the Pet level or system level; system-level
+        expansion provides more consistent global behavior.
+        """
+        results: List[Task] = []
+        for t in self.tasks:
+            try:
+                if t.is_due_on(target_date):
+                    results.append(t)
+            except Exception:
+                # be forgiving for placeholder implementations
+                continue
+        return results
 
 
 @dataclass
 class Owner:
     name: str
     pets: List[Pet] = field(default_factory=list)
+    owner_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def add_pet(self, pet: Pet) -> None:
         """Add a pet to the owner (placeholder)."""
-        pass
+        # disallow duplicate pet names for simplicity
+        if any(p.name == pet.name for p in self.pets):
+            raise ValueError(f"Pet with name '{pet.name}' already exists for owner '{self.name}'")
+        self.pets.append(pet)
 
     def remove_pet(self, pet_name: str) -> bool:
         """Remove a pet by name; return True if removed (placeholder)."""
-        pass
+        for i, p in enumerate(self.pets):
+            if p.name == pet_name:
+                del self.pets[i]
+                return True
+        return False
 
     def get_pet(self, pet_name: str) -> Optional[Pet]:
         """Return a pet by name or None if not found (placeholder)."""
-        pass
+        for p in self.pets:
+            if p.name == pet_name:
+                return p
+        return None
+
+    def get_all_tasks(self) -> List[Task]:
+        """Return all tasks across this owner's pets."""
+        results: List[Task] = []
+        for p in self.pets:
+            results.extend(p.tasks)
+        return results
 
 
 class PawPalSystem:
+    """Top-level system managing owners, pets and tasks.
+
+    Responsibilities to keep here:
+    - global owner/pet lookup and uniqueness (IDs)
+    - normalization of datetimes (tz)
+    - recurrence expansion for cross-owner queries
+    - conflict detection and global sorting
+    """
+
     def __init__(self, owners: Optional[Dict[str, Owner]] = None) -> None:
+        # owners keyed by owner_id (not owner.name) to avoid collisions
         self.owners: Dict[str, Owner] = owners if owners is not None else {}
 
     def add_owner(self, owner: Owner) -> None:
-        """Add an owner to the system (placeholder)."""
-        pass
+        """Add an owner to the system (placeholder).
 
-    def schedule_task(self, owner_name: str, pet_name: str, task: Task) -> None:
-        """Schedule a task for a pet of an owner (placeholder)."""
-        pass
+        Should validate uniqueness of owner.owner_id and decide whether
+        to expose convenience lookups by name.
+        """
+        if owner.name in self.owners:
+            raise ValueError(f"Owner with name '{owner.name}' already exists")
+        self.owners[owner.name] = owner
+
+    def schedule_task(self, owner_id: str, pet_id: str, task: Task) -> None:
+        """Schedule a task for a pet of an owner (placeholder).
+
+        Expected behavior:
+        - validate owner_id and pet_id exist
+        - normalize task datetimes (tz)
+        - attach pet_id to task and add to pet.tasks
+        - update any date-indexes if used
+        """
+        # This method signature is kept backward-compatible with owner_id/pet_id
+        # but we also support name-based scheduling via owner name and pet name.
+        # Attempt to resolve owner by name first (common CLI case).
+        owner = self.owners.get(owner_id)
+        if owner is None:
+            raise ValueError(f"Owner '{owner_id}' not found")
+
+        # find pet by id or name
+        pet = None
+        for p in owner.pets:
+            if getattr(p, "pet_id", None) == pet_id or p.name == pet_id:
+                pet = p
+                break
+
+        if pet is None:
+            raise ValueError(f"Pet '{pet_id}' not found for owner '{owner.name}'")
+
+        # attach pet reference and add
+        task.pet_id = getattr(pet, "pet_id", None)
+        pet.add_task(task)
 
     def get_todays_tasks(self, target_date: date) -> List[Task]:
-        """Return all tasks scheduled for target_date across owners/pets (placeholder)."""
-        pass
+        """Return all task occurrences scheduled for target_date across owners/pets (placeholder).
+
+        Consider returning richer tuples (owner, pet, task, occurrence_start, occurrence_end)
+        for better context in the UI and conflict detection.
+        """
+        # Return tasks due on target_date across all owners and pets
+        results: List[Task] = []
+        for owner in self.owners.values():
+            for pet in owner.pets:
+                results.extend(pet.get_tasks_for_date(target_date))
+        return results
 
     def detect_conflicts(self, target_date: date) -> List[Tuple[Task, Task]]:
-        """Detect conflicting tasks on target_date (placeholder)."""
-        pass
+        """Detect conflicting tasks on target_date (placeholder).
+
+        Efficient implementations should:
+        - expand recurring tasks to occurrences on target_date
+        - convert occurrences to (start, end)
+        - sort by start and scan for overlaps (O(m log m) per date)
+        """
+        # Build occurrences list with start/end
+        occs: List[Tuple[Task, datetime, datetime]] = []
+        for owner in self.owners.values():
+            for pet in owner.pets:
+                for t in pet.get_tasks_for_date(target_date):
+                    start = t.due_datetime
+                    end = start + t.duration if (t.duration is not None) else start
+                    occs.append((t, start, end))
+
+        # sort by start
+        occs.sort(key=lambda x: x[1])
+
+        conflicts: List[Tuple[Task, Task]] = []
+        # naive O(n^2) for small lists: compare each pair where starts overlap
+        for i in range(len(occs)):
+            ti, si, ei = occs[i]
+            for j in range(i + 1, len(occs)):
+                tj, sj, ej = occs[j]
+                # overlap if the later start is strictly before the earlier end.
+                # Use strict < so that two instantaneous tasks at the same
+                # timestamp (start == end) are not considered a conflict.
+                if sj < ei:
+                    conflicts.append((ti, tj))
+                else:
+                    # since sorted by start, no further overlaps for i
+                    break
+
+        return conflicts
 
     def sort_tasks(self, tasks: List[Task]) -> List[Task]:
-        """Return tasks sorted by priority/due time (placeholder)."""
-        pass
+        """Return tasks sorted by priority and start/due time (placeholder)."""
+        # Sort by due_datetime (earlier first) then by priority (higher first)
+        def key_fn(t: Task):
+            dd = t.due_datetime if t.due_datetime is not None else datetime.max
+            return (dd, -t.priority)
+
+        return sorted(tasks, key=key_fn)
+
+
+if __name__ == "__main__":
+    # Small demo: create system, owner, pet, and a few tasks; print today's tasks
+    system = PawPalSystem()
+    owner = Owner(name="Alice")
+    system.add_owner(owner)
+
+    pet = Pet(name="Fido", species="dog", age=4)
+    owner.add_pet(pet)
+
+    now = datetime.now()
+    t1 = Task(title="Morning walk", due_datetime=now.replace(hour=9, minute=0, second=0, microsecond=0), priority=2)
+    t2 = Task(title="Medication", due_datetime=now.replace(hour=9, minute=0, second=0, microsecond=0), priority=5)
+    t3 = Task(title="Grooming", due_datetime=now.replace(hour=15, minute=0, second=0, microsecond=0), priority=1,
+              recurrence=Recurrence(freq="weekly", interval=1))
+
+    system.schedule_task(owner.name, pet.name, t1)
+    system.schedule_task(owner.name, pet.name, t2)
+    system.schedule_task(owner.name, pet.name, t3)
+
+    today = date.today()
+    todays = system.get_todays_tasks(today)
+    print(f"Tasks for {today}:")
+    for t in system.sort_tasks(todays):
+        pet_info = next((p for o in system.owners.values() for p in o.pets if getattr(p, 'pet_id', None) == t.pet_id), None)
+        pet_name = pet_info.name if pet_info is not None else "<unknown>"
+        print(f"- [{t.status.value}] {t.title} (pet: {pet_name}) at {t.due_datetime} priority={t.priority}")
+
+    conflicts = system.detect_conflicts(today)
+    if conflicts:
+        print("Conflicts detected:")
+        for a, b in conflicts:
+            print(f"- {a.title} conflicts with {b.title} at {a.due_datetime}")
