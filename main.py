@@ -5,6 +5,7 @@ def main():
     system = PawPalSystem()
 
     owner = Owner(name="Taylor")
+    system.add_owner(owner)
 
     dog = Pet(name="Fido", species="Dog", age=4)
     cat = Pet(name="Whiskers", species="Cat", age=2)
@@ -46,6 +47,13 @@ def main():
               f"at {task.due_datetime.strftime('%H:%M')} "
               f"priority={task.priority}"
               )
+
+    # Detect exact-time conflicts and print warnings
+    warnings = system.detect_exact_time_conflicts(today)
+    if warnings:
+        print("\nConflicts detected:")
+        for w in warnings:
+            print("- "+w)
 
 if __name__ == "__main__":
     main()

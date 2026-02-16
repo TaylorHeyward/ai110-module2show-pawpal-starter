@@ -234,6 +234,50 @@ class PawPalSystem:
         task.pet_id = getattr(pet, "pet_id", None)
         pet.add_task(task)
 
+    def mark_task_complete(self, owner_name: str, pet_name: str, task_id: str) -> None:
+        """Mark a task done and, if recurring daily/weekly, schedule the next occurrence."""
+        owner = self.owners.get(owner_name)
+        if owner is None:
+            raise ValueError(f"Owner '{owner_name}' not found")
+
+        pet = owner.get_pet(pet_name)
+        if pet is None:
+            raise ValueError(f"Pet '{pet_name}' not found for owner '{owner_name}'")
+
+        # find the task
+        task = None
+        for t in pet.tasks:
+            if t.task_id == task_id:
+                task = t
+                break
+
+        if task is None:
+            raise ValueError(f"Task '{task_id}' not found for pet '{pet_name}'")
+
+        # mark original done
+        task.mark_done()
+
+        # if recurring daily or weekly, create next occurrence
+        if isinstance(task.recurrence, Recurrence) and task.due_datetime is not None:
+            freq = task.recurrence.freq
+            if freq == "daily":
+                delta = timedelta(days=1)
+            elif freq == "weekly":
+                delta = timedelta(weeks=1)
+            else:
+                return
+
+            new_due = task.due_datetime + delta
+            new_task = Task(
+                title=task.title,
+                due_datetime=new_due,
+                priority=task.priority,
+                duration=task.duration,
+                recurrence=task.recurrence,
+            )
+            new_task.pet_id = task.pet_id
+            pet.add_task(new_task)
+
     def get_todays_tasks(self, target_date: date) -> List[Task]:
         """Return all tasks due on target_date across all owners and pets."""
         # Return tasks due on target_date across all owners and pets
@@ -273,6 +317,29 @@ class PawPalSystem:
                     break
 
         return conflicts
+
+    def detect_exact_time_conflicts(self, target_date: date) -> List[str]:
+        """Return warning strings for tasks that share the exact same due_datetime on target_date."""
+        # Map datetime -> list of (owner, pet, task)
+        groups: Dict[datetime, List[Tuple[Owner, Pet, Task]]] = {}
+        for owner in self.owners.values():
+            for pet in owner.pets:
+                for t in pet.get_tasks_for_date(target_date):
+                    if t.due_datetime is None:
+                        continue
+                    dt = t.due_datetime
+                    groups.setdefault(dt, []).append((owner, pet, t))
+
+        warnings: List[str] = []
+        for dt, entries in groups.items():
+            if len(entries) > 1:
+                # create a single warning summarizing all tasks at this datetime
+                parts = []
+                for owner, pet, t in entries:
+                    parts.append(f"{owner.name}/{pet.name}:{t.title} (id={t.task_id})")
+                warnings.append(f"Conflict at {dt}: " + ", ".join(parts))
+
+        return warnings
 
     def sort_tasks(self, tasks: List[Task]) -> List[Task]:
         """Return tasks sorted by due datetime (earlier first), then priority (higher first)."""
@@ -316,3 +383,11 @@ if __name__ == "__main__":
         print("Conflicts detected:")
         for a, b in conflicts:
             print(f"- {a.title} conflicts with {b.title} at {a.due_datetime}")
+
+    # Demonstrate marking a recurring task done and auto-creating the next occurrence
+    print("\nMarking recurring task 'Grooming' done and creating next occurrence...")
+    system.mark_task_complete(owner.name, pet.name, t3.task_id)
+
+    print(f"Tasks for pet {pet.name} after completion:")
+    for t in pet.tasks:
+        print(f"- [{t.status.value}] {t.title} at {t.due_datetime} (id={t.task_id})")

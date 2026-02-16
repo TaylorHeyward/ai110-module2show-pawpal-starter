@@ -4,10 +4,67 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+Before designing the system, I identified three core actions the user should be able to perform. 
+First, a user should be able to add and manage pets, since all care tasks are tied to a specific animal. 
+Second, the user should be able to schedule care tasks such as feedings, walks, medications, or appointments, including recurring tasks for daily routines. 
+Third, the user should be able to view all tasks for the current day across pets, prioritized by time and urgency, so they can clearly see what needs attention.
+
+For the initial design, I identified four main objects: Owner, Pet, Task, and PawPalSystem. 
+The Owner class stores basic user information and manages a collection of pets. 
+Each Pet holds identifying details and a list of care tasks associated with that animal. 
+Tasks represent individual responsibilities such as feedings, walks, or appointments and store information like due time, priority, and recurrence. 
+The PawPalSystem class acts as the coordinator, handling task scheduling, sorting, and conflict detection across pets and owners.
 
 **b. Design changes**
+
+classDiagram
+class Owner {
+  +str name
+  +list pets
+  +add_pet(pet: Pet) void
+  +remove_pet(pet_name: str) bool
+  +get_pet(pet_name: str) Pet
+}
+
+class Pet {
+  +str name
+  +str species
+  +int age
+  +str notes
+  +list tasks
+  +add_task(task: Task) void
+  +remove_task(task_id: str) bool
+  +get_tasks_for_date(date) list
+}
+
+class Task {
+  +str task_id
+  +str title
+  +datetime due_datetime
+  +int priority
+  +str status
+  +str recurrence
+  +mark_done() void
+  +is_due_on(date) bool
+  +next_occurrence() datetime
+}
+
+class PawPalSystem {
+  +dict owners
+  +add_owner(owner: Owner) void
+  +schedule_task(owner_name: str, pet_name: str, task: Task) void
+  +get_todays_tasks(date) list
+  +detect_conflicts(date) list
+  +sort_tasks(tasks: list) list
+}
+
+Owner "1" o-- "*" Pet : owns
+Pet "1" o-- "*" Task : has
+PawPalSystem "1" o-- "*" Owner : manages
+
+After reviewing the class skeleton with AI feedback, no major structural changes were needed. 
+The existing relationships between Owner, Pet, Task, and PawPalSystem were sufficient to support scheduling, prioritization, and conflict detection. 
+Any suggested improvements were implementation-level details that did not require changes to the overall design.
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
@@ -23,8 +80,7 @@
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+I chose a lightweight conflict rule that only flags tasks scheduled at the exact same due_datetime, instead of checking whether task intervals overlap. This keeps the scheduler simple and fast for a CLI-focused MVP, but it means longer tasks that overlap in time won't be reported as conflicts. For my use-case—mostly short, point-in-time care actions like feedings and meds—this tradeoff is acceptable and avoids adding interval math and timezone complexity. If users later need richer detection, it can be extended to compare start/end intervals.
 
 ---
 
