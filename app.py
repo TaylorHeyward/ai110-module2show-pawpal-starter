@@ -1,13 +1,22 @@
 import streamlit as st
-from pawpal_system import Owner, Pet, Task, PawPalSystem
 from datetime import datetime, date
+from pawpal_system import Owner, Pet, Task, PawPalSystem
 
+# Initialize persistent system in session_state
 if "system" not in st.session_state:
     st.session_state.system = PawPalSystem()
 
+# Ensure an owner object exists in session_state and is registered with the system
 if "owner" not in st.session_state:
     st.session_state.owner = Owner(name="Taylor")  # or "Default Owner"
-    st.session_state.system.add_owner(st.session_state.owner)
+    try:
+        st.session_state.system.add_owner(st.session_state.owner)
+    except ValueError:
+        # owner already exists in system; ignore
+        pass
+
+# NOTE: This app requires Streamlit installed locally.
+# Install with: pip install streamlit
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -149,10 +158,35 @@ st.header("Today's Schedule")
 
 today = date.today()
 tasks_today = st.session_state.system.get_todays_tasks(today)
-
-if len(tasks_today) == 0:
+# Sort tasks using backend sorter
+if not tasks_today:
     st.info("No tasks scheduled for today.")
 else:
-    for t in tasks_today:
-        status_value = getattr(t.status, "value", t.status)
-        st.write(f"- [{status_value}] {t.title} at {t.due_datetime.strftime('%H:%M')} (priority {t.priority})")
+    try:
+        sorted_tasks = st.session_state.system.sort_tasks(tasks_today)
+    except Exception:
+        # fallback
+        sorted_tasks = tasks_today
+
+    # Build table rows
+    rows = []
+    for t in sorted_tasks:
+        status_value = getattr(t.status, "value", str(t.status))
+        time_str = t.due_datetime.strftime('%H:%M') if t.due_datetime is not None else "--:--"
+        rows.append({"title": t.title, "time": time_str, "priority": t.priority, "status": status_value})
+
+    st.table(rows)
+
+    # Detect conflicts (interval overlaps) and show warnings
+    try:
+        conflicts = st.session_state.system.detect_conflicts(today)
+    except Exception:
+        conflicts = []
+
+    if conflicts:
+        msgs = []
+        for a, b in conflicts:
+            atime = a.due_datetime.strftime('%Y-%m-%d %H:%M') if a.due_datetime is not None else 'unknown'
+            btime = b.due_datetime.strftime('%Y-%m-%d %H:%M') if b.due_datetime is not None else 'unknown'
+            msgs.append(f"{a.title} ({atime}) conflicts with {b.title} ({btime})")
+        st.warning("Conflicts detected:\n" + "\n".join(msgs))
