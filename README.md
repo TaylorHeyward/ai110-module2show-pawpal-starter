@@ -48,3 +48,16 @@ pip install -r requirements.txt
 - Supports filtering tasks by completion status or by pet to focus the CLI view.
 - When you mark a recurring task done (daily or weekly), the system auto-creates the next occurrence so routines continue without manual re-entry.
 - Emits lightweight conflict warnings when multiple tasks share the exact same due datetime so you can resolve collisions quickly.
+
+Smarter Scheduling
+Sorts tasks by due time so daily plans print in order.
+Filters tasks by status (pending vs done).
+Detects scheduling conflicts when two tasks share the same time.
+Supports simple recurring tasks (daily or weekly) by creating the next occurrence when completed.
+Then save.
+If they also want Testing section, add:
+
+Testing PawPal+
+Run: python -m pytest
+Covers: sorting correctness, recurrence next occurrence, conflict detection, pets with no tasks.
+Confidence level: ⭐⭐⭐⭐ (4/5) or ⭐⭐⭐⭐⭐ (5/5) once all tests pass.

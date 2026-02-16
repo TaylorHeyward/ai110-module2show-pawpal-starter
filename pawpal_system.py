@@ -307,10 +307,9 @@ class PawPalSystem:
             ti, si, ei = occs[i]
             for j in range(i + 1, len(occs)):
                 tj, sj, ej = occs[j]
-                # overlap if the later start is strictly before the earlier end.
-                # Use strict < so that two instantaneous tasks at the same
-                # timestamp (start == end) are not considered a conflict.
-                if sj < ei:
+                # overlap if the later start is before or equal to the earlier end.
+                # Treat tasks with the same due_datetime as a conflict.
+                if sj <= ei:
                     conflicts.append((ti, tj))
                 else:
                     # since sorted by start, no further overlaps for i
