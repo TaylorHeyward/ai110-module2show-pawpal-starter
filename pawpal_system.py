@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from asyncio import tasks
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
 from enum import Enum
@@ -190,6 +191,14 @@ class PawPalSystem:
     - recurrence expansion for cross-owner queries
     - conflict detection and global sorting
     """
+
+    def sort_by_time(self, tasks):
+        """Return tasks sorted by due time."""
+        return sorted(tasks, key=lambda t: t.due_datetime)
+
+    def filter_by_status(self, tasks, status):
+        """Return tasks filtered by completion status."""
+        return [t for t in tasks if t.status == status]
 
     def __init__(self, owners: Optional[Dict[str, Owner]] = None) -> None:
         """Create a new PawPalSystem with an optional initial owners mapping."""
