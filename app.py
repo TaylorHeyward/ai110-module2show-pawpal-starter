@@ -1,4 +1,13 @@
 import streamlit as st
+from pawpal_system import Owner, Pet, Task, PawPalSystem
+from datetime import datetime, date
+
+if "system" not in st.session_state:
+    st.session_state.system = PawPalSystem()
+
+if "owner" not in st.session_state:
+    st.session_state.owner = Owner(name="Taylor")  # or "Default Owner"
+    st.session_state.system.add_owner(st.session_state.owner)
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -86,3 +95,64 @@ Suggested approach:
 4. Connect your scheduler here and display results.
 """
     )
+st.header("Add a Pet")
+
+with st.form("add_pet_form"):
+    pet_name = st.text_input("Pet name")
+    species = st.text_input("Species")
+    age = st.number_input("Age", min_value=0, step=1)
+    notes = st.text_area("Notes (optional)")
+    submitted = st.form_submit_button("Add Pet")
+
+if submitted:
+    try:
+        new_pet = Pet(name=pet_name, species=species, age=int(age), notes=notes)
+        st.session_state.owner.add_pet(new_pet)
+        st.success(f"Added pet: {pet_name}")
+    except Exception as e:
+        st.error(str(e))
+st.subheader("Your Pets")
+if len(st.session_state.owner.pets) == 0:
+    st.info("No pets added yet.")
+else:
+    for p in st.session_state.owner.pets:
+        st.write(f"- {p.name} ({p.species}, age {p.age})")
+pet_names = [p.name for p in st.session_state.owner.pets]
+st.header("Schedule a Task")
+
+if len(pet_names) == 0:
+    st.warning("Add a pet first before scheduling tasks.")
+else:
+    with st.form("add_task_form"):
+        pet_name = st.selectbox("Choose a pet", pet_names)
+        title = st.text_input("Task title (Walk, Feeding, Medication, Appointment)")
+        due_date = st.date_input("Due date", value=date.today())
+        due_time = st.time_input("Due time")
+        priority = st.number_input("Priority (1 low, 5 high)", min_value=1, max_value=5, value=3, step=1)
+        task_id = st.text_input("Task ID", value=f"task-{int(datetime.now().timestamp())}")
+        submitted_task = st.form_submit_button("Add Task")
+
+    if submitted_task:
+        try:
+            due_dt = datetime.combine(due_date, due_time)
+            task = Task(
+                task_id=task_id,
+                title=title,
+                due_datetime=due_dt,
+                priority=int(priority),
+            )
+            st.session_state.system.schedule_task(st.session_state.owner.name, pet_name, task)
+            st.success(f"Scheduled: {title} for {pet_name} at {due_dt.strftime('%Y-%m-%d %H:%M')}")
+        except Exception as e:
+            st.error(str(e))
+st.header("Today's Schedule")
+
+today = date.today()
+tasks_today = st.session_state.system.get_todays_tasks(today)
+
+if len(tasks_today) == 0:
+    st.info("No tasks scheduled for today.")
+else:
+    for t in tasks_today:
+        status_value = getattr(t.status, "value", t.status)
+        st.write(f"- [{status_value}] {t.title} at {t.due_datetime.strftime('%H:%M')} (priority {t.priority})")
