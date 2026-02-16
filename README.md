@@ -22,6 +22,13 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Features
+
+- Task sorting by due time with priority tiebreaks so urgent items surface first.
+- Conflict detection that emits warnings when tasks share the exact same due datetime.
+- Support for simple recurring tasks (daily and weekly); completing a recurring task auto-creates the next occurrence.
+- CLI demo available via `main.py` and a Streamlit UI visualization in `app.py` for interactive use.
+
 ## Getting started
 
 ### Setup
@@ -60,4 +67,4 @@ If they also want Testing section, add:
 Testing PawPal+
 Run: python -m pytest
 Covers: sorting correctness, recurrence next occurrence, conflict detection, pets with no tasks.
-Confidence level: ⭐⭐⭐⭐ (4/5) or ⭐⭐⭐⭐⭐ (5/5) once all tests pass.
+Confidence level: ⭐⭐⭐⭐ (4/5)
