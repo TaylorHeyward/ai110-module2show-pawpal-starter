@@ -29,6 +29,16 @@ Your final app should:
 - Support for simple recurring tasks (daily and weekly); completing a recurring task auto-creates the next occurrence.
 - CLI demo available via `main.py` and a Streamlit UI visualization in `app.py` for interactive use.
 
+## System Architecture
+
+![System Architecture](uml_final.png)
+
+## Demo
+
+Below is a screenshot of the Streamlit UI showing the generated schedule and conflict warnings.
+
+![Streamlit Demo](streamlit_screenshot.png)
+
 ## Getting started
 
 ### Setup

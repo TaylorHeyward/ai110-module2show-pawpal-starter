@@ -105,10 +105,13 @@ I chose a lightweight conflict rule that only flags tasks scheduled at the exact
 - What behaviors did you test?
 - Why were these tests important?
 
+- I tested core flows: scheduling a task, retrieving today's tasks, sorting by due time and priority, detecting exact-time conflicts, and the recurring-task completion that creates the next occurrence.
+- These tests cover the user-facing behaviors the CLI and Streamlit UI depend on, so they catch regressions in the scheduler's core responsibilities.
+
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+- I'm moderately confident: unit tests cover the main happy paths and the lightweight conflict/recurrence rules, and they all pass in the current suite.
+- Next edge cases I'd add: timezone/DST handling, tasks with durations that span days (interval overlaps), recurrence limits (until/count), and ambiguous owner/pet name collisions.
 
 ---
 
@@ -118,10 +121,21 @@ I chose a lightweight conflict rule that only flags tasks scheduled at the exact
 
 - What part of this project are you most satisfied with?
 
-**b. What you would improve**
+- I’m most satisfied with getting a working end-to-end scheduler: the dataclass models, recurring-task flow, basic conflict detection, and a small Streamlit demo all tie together.
 
-- If you had another iteration, what would you improve or redesign?
+**b. What I would improve**
+
+- In a future iteration I'd formalize recurrence using a library (rrule), make all datetimes timezone-aware, and add persistent storage so the system scales beyond a single-session CLI/demo.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+- Working with AI accelerated design and iteration, but it amplified the need for clear contracts: I had to decide where responsibilities live (Task vs PawPalSystem), validate suggestions with tests, and be the final architect making trade-offs.
+
+---
+
+### AI collaboration notes
+
+- How Copilot helped: It assisted across phases — sketching UML, generating class skeletons, proposing recurrence/conflict approaches, and producing small, testable implementations and examples.
+- One AI suggestion I modified: I rejected a free-form recurrence string in favor of a structured Recurrence dataclass (or rrule later) because free strings are brittle for computing next occurrences.
+- Separating chat sessions improved organization: each session focused on a single feature (scheduling, recurrence, conflicts, UI), which made iterations and rollbacks easier.
+- As lead architect I learned to treat AI output as a draft: I evaluated suggestions against system contracts, added tests, and kept final control over design choices and trade-offs.
